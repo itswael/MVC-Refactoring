@@ -1,9 +1,8 @@
 const express = require('express');
 const mongodb = require('mongodb');
 
-const db = require('../data/database');
+const Post = require('../models/post');
 
-const ObjectId = mongodb.ObjectId;
 const router = express.Router();
 
 router.get('/', function (req, res) {
@@ -15,7 +14,7 @@ router.get('/admin', async function (req, res) {
     return res.status(401).render('401');
   }
 
-  const posts = await db.getDb().collection('posts').find().toArray();
+  const posts = await Post.fetchAll();
 
   let sessionInputData = req.session.inputData;
 
@@ -57,19 +56,15 @@ router.post('/posts', async function (req, res) {
     return; // or return res.redirect('/admin'); => Has the same effect
   }
 
-  const newPost = {
-    title: enteredTitle,
-    content: enteredContent,
-  };
-
-  await db.getDb().collection('posts').insertOne(newPost);
+  const newPost = new Post(enteredTitle, enteredContent);
+  await newPost.save();
 
   res.redirect('/admin');
 });
 
 router.get('/posts/:id/edit', async function (req, res) {
-  const postId = new ObjectId(req.params.id);
-  const post = await db.getDb().collection('posts').findOne({ _id: postId });
+  const sPost  = new Post('', '', req.params.id);
+  const post = await sPost.fetch();
 
   if (!post) {
     return res.render('404'); // 404.ejs is missing at this point - it will be added later!
@@ -97,7 +92,6 @@ router.get('/posts/:id/edit', async function (req, res) {
 router.post('/posts/:id/edit', async function (req, res) {
   const enteredTitle = req.body.title;
   const enteredContent = req.body.content;
-  const postId = new ObjectId(req.params.id);
 
   if (
     !enteredTitle ||
@@ -116,20 +110,15 @@ router.post('/posts/:id/edit', async function (req, res) {
     return; 
   }
 
-  await db
-    .getDb()
-    .collection('posts')
-    .updateOne(
-      { _id: postId },
-      { $set: { title: enteredTitle, content: enteredContent } }
-    );
+  const post = new Post(enteredTitle, enteredContent, req.params.id);
+  await post.save();
 
   res.redirect('/admin');
 });
 
 router.post('/posts/:id/delete', async function (req, res) {
-  const postId = new ObjectId(req.params.id);
-  await db.getDb().collection('posts').deleteOne({ _id: postId });
+  const post = new Post('', '', req.params.id);
+  await post.delete();
 
   res.redirect('/admin');
 });
